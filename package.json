@@ -1,0 +1,26 @@
+{
+  "name": "SheetBot",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "alasql": "^0.3.1",
+    "botkit": "^0.2.2",
+    "botkit-middleware-witai": "git://github.com/haritzmedina/botkit-middleware-witai.git",
+    "cheerio": "latest",
+    "google-auth-library": "^0.9.8",
+    "googleapis": "^11.0.0",
+    "jquery": "^3.0.0",
+    "jsdom": "9.3.0",
+    "node-wit": "^4.0.0",
+    "properties-reader": "0.0.15",
+    "readline": "^1.3.0",
+    "request": "latest",
+    "xmldom": "^0.1.22",
+    "xpath": "latest"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-eslint": "^3.0.1",
+    "run-sequence": "^1.2.2"
+  }
+}

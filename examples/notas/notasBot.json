@@ -1,0 +1,29 @@
+{
+  "description": "Este bot te ayuda a obtener las notas de un alumno.",
+  "help": "Hola! Soy notasbot y te ayudaré a obtener tus calificaciones. Prueba preguntandome por tus notas de matematica o lengua",
+  "tabularData": [
+    {
+      "gSheetToken": "1Kp1mNaG8K6lG_DPh906hX__pY234DWpR8S357UGlxYw",
+      "gSheetName": "NotasLengua",
+      "gSheetRange": "A1:E4",
+      "tableName": "NotasLengua"
+    },
+    {
+      "gSheetToken": "1Kp1mNaG8K6lG_DPh906hX__pY234DWpR8S357UGlxYw",
+      "gSheetName": "NotasMate",
+      "gSheetRange": "A1:E4",
+      "tableName": "NotasMate"
+    }
+  ],
+  "intents": [
+    {
+      "ID": "mediaNotasMate",
+      "sourceTableName": "NotasMate",
+      "output": "Parcial1+Parcial2+Parcial3",
+      "query": "SELECT Parcial1+Parcial2+Parcial3 FROM NotasMate WHERE Alumno=?",
+      "entities": [{
+
+      }]
+    }
+  ]
+}
