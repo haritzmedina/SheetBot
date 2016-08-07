@@ -122,22 +122,44 @@ class SheetBot{
         this.model.botController.hears([intent.ID], 'direct_message,direct_mention,mention', this._wit.hears, function(bot,message){
             // Retrieve from wit.ai the recognized entities which matches with required ones
             var entities = me.fillEntities(intent.entities, message.entities);
+            // Check if retrieved entities exists (or need to ask for them)
+            entities = me.checkEntitiesExistenceInDatabase(entities, intent.sourceTable);
             // Retrieve non found entities on user message
             var nonFoundEntities = me.retrieveNonFoundEntities(entities);
-            // TODO Create handler for last element
+            var initialResponseHandler = null; // TODO Define initial response handler
+            if(nonFoundEntities.length>0){
+                // TODO Create handler for last element
+                let currentElementHandler = me.retrieveLastEntityHandler(nonFoundEntities[0], entities, intent);
+                // TODO Create handler for the rest of the elements
+                for(let i=1;i<nonFoundEntities.length;i++){
+                    currentElementHandler = me.retrieveEntityHandler(
+                        nonFoundEntities[i], entities, intent, currentElementHandler);
+                }
+                initialResponseHandler = currentElementHandler;
+            }
+            else{
+                //TODO Define conversation handler with the response
+                initialResponseHandler = me.retrieveNoRequiredEntityHandler(entities, intent);
 
-            // TODO Create handler for the rest of the elements
-
-            // TODO Start the bot
+            }
+            // Start the conversation
+            bot.startConversation(message, initialResponseHandler);
         });
     }
-    retrieveLastEntityHandler(entity){
-        return () => {
+
+    retrieveLastEntityHandler(currentEntity, entities, intent){
+        var me = this;
+        return (response, convo) => {
             // TODO Ask Question
-
-            // TODO Retrieve response
-
-            // TODO Check if element exists in table (if not, send suggestions and re-ask)
+            convo.ask(currentEntity.columnQuestion, (response, convo) => {
+                // TODO Retrieve response
+                let userResponse = response.text;
+                // TODO Check if element exists in table (if not, send suggestions and re-ask)
+                if(me.checkValueExistsInDatabase(
+                        currentEntity.column, userResponse, currentEntity.function, intent.sourceTable)){
+                    console.log('Element exists');
+                }
+            });
 
             // TODO Create query
 
@@ -145,7 +167,7 @@ class SheetBot{
         };
     }
 
-    retrieveEntityHandler(entity){
+    retrieveEntityHandler(currentEntity, entities, intent, nextEntityCallback){
         return () => {
             // TODO Ask question
 
@@ -157,8 +179,84 @@ class SheetBot{
         };
     }
 
+    retrieveNoRequiredEntityHandler(entities, intent) {
+        return (response, convo) => {
+            // Create query
+            var sqlQuery = this.createSQLQuery(entities, intent);
+            // Execute query
+            var results = this.executeSQLQuery(sqlQuery);
+            // TODO Prepare response
+            var responses = this.parseQueryResults(results, intent.response);
+            // TODO Response with output
+            if(responses.length>0){
+                for(let i=0;i<responses.length;i++){
+                    convo.say(responses[i]);
+                }
+            }
+            else{
+                if(intent.response.customNoResultsFoundMessage){
+                    convo.say(intent.response.customNoResultsFoundMessage);
+                }
+                else{
+                    convo.say("Results not found");
+                }
 
+            }
+            // Finish answer processing
+            convo.next();
+        }
+    }
 
+    createSQLQuery(entities, intent){
+        // Construct where condition based on entities
+        let whereCondition = "";
+        for(let i=0;i<entities.length;i++){
+            whereCondition += " "+this.whereConditionParsing(entities[i].column, entities[i].function, entities[i].value);
+        }
+        let sqlQuery = this.parseQuery('SELECT %s FROM %s WHERE %s',
+            intent.response.outputColumn,
+            intent.sourceTable,
+            whereCondition);
+        return sqlQuery;
+    }
+
+    whereConditionParsing(column, operand, value){
+        const parsingMethods = {
+            "LIKE" : (value) => {
+                return "\"%"+value+"%\"";
+            },
+            "=" : (value) => {
+                return  "\""+value+"\"";
+            },
+            "!=": (value) => {
+                return  "\""+value+"\"";
+            },
+            ">": (value) => {
+                return  "\""+value+"\"";
+            },
+            ">=": (value) => {
+                return  "\""+value+"\"";
+            },
+            "<": (value) => {
+                return  "\""+value+"\"";
+            },
+            "<=": (value) => {
+                return  "\""+value+"\"";
+            },
+            "!<": (value) => {
+                return  "\""+value+"\"";
+            },
+            "!>": (value) => {
+                return  "\""+value+"\"";
+            }
+        };
+        if(parsingMethods[operand]){
+            return column+" "+operand+" "+parsingMethods[operand](value);
+        }
+        else{
+            return column+" = "+value;
+        }
+    }
 
     fillEntities(definedEntities, foundEntities) {
         var remainEntities = JSON.parse(JSON.stringify(definedEntities));;
@@ -193,6 +291,60 @@ class SheetBot{
         this.model.botController.hears(["greetings"], 'direct_message,direct_mention,mention', this._wit.hears, function(bot, message){
             bot.reply(message, responseMessage);
         });
+    }
+
+    checkEntitiesExistenceInDatabase(entities, sourceTable) {
+        for(let i=0;i<entities.length;i++){
+            if(!this.checkValueExistsInDatabase(entities[i].column, entities[i].function, entities[i].value, sourceTable)){
+                entities.value = null; // Remove user input value cause not exists in database (need to ask for it)
+            }
+        }
+        return entities;
+    }
+
+    checkValueExistsInDatabase(column, value, operand, sourceTable) {
+        let whereCondition = this.whereConditionParsing(column, value, operand);
+        let sqlQuery = this.parseQuery(
+            'SELECT COUNT(*) AS number FROM %s WHERE %s',
+            sourceTable,
+            whereCondition);
+        console.log(sqlQuery);
+        let result = this.executeSQLQuery(sqlQuery);
+        return result.number > 0;
+    }
+
+    parseQuery(str){
+        var args = [].slice.call(arguments, 1),
+            i = 0;
+
+        return str.replace(/%s/g, function() {
+            return args[i++];
+        });
+    }
+
+    executeSQLQuery(sqlQuery) {
+        return this.model.tabularData.alasql(sqlQuery);
+    }
+
+    parseQueryResults(results, definedResponse) {
+        var responses = [];
+        for(let i=0;i<definedResponse.numberOfResponses;i++){
+            if(results[i]){
+                let response = "";
+                let outputColumns = Object.keys(results[i]);
+                for(let j=0;j<outputColumns.length;j++){
+                    if(definedResponse.showColumnName){
+                        response += outputColumns[j]+": "+results[i][outputColumns[j]]+"\n";
+                    }
+                    else{
+                        response += results[i][outputColumns[j]]+"\n";
+                    }
+                }
+                responses.push(response);
+            }
+        }
+        return responses;
+
     }
 }
 
