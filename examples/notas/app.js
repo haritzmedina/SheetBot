@@ -1,3 +1,5 @@
 var SheetBot = require('../../src/SheetBot');
 
-new SheetBot('../configuration.properties', 'notasBot.json', '../client_secret.json');
+var notasSheetBot = new SheetBot('configuration.properties', 'notasBot.json', '../client_secret.json');
+
+notasSheetBot.startBot();

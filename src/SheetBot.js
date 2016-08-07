@@ -26,6 +26,14 @@ class SheetBot{
             token: this._configuration.get('onekin.witai.token')
         });
 
+        // Load bot dependencies
+        this.model.botController = this._Botkit.slackbot();
+        this.model.botController.middleware.receive.use(this._wit.receive);
+        this.model.bot = this.model.botController.spawn({
+            token: this._configuration.get('onekin.slack.token')
+        });
+
+        // Load tabular data dependencies
         this.model.tabularData.alasql = require('alasql');
     }
 
@@ -36,8 +44,9 @@ class SheetBot{
         // Load sheet data
         this.initializeTabularData(gSheetAuthFile, this.model.schema.tabularData);
 
-        // TODO Load intents behaviour
-        console.log('a');
+        // Load intents behaviour
+        this.loadGreetingsHandler(this.model.schema.greetings);
+        this.loadIntents(this.model.schema.intents);
     }
 
     loadConfiguration(tokenFile){
@@ -100,6 +109,90 @@ class SheetBot{
         this.model.tabularData.alasql('CREATE TABLE '+tableName);
         // Insert data in table
         this.model.tabularData.alasql('SELECT * INTO '+tableName+' FROM ?', [formatedTable]);
+    }
+
+    loadIntents(intents){
+        for(let i=0;i<intents.length;i++){
+            this.loadIntent(intents[i]);
+        }
+    }
+
+    loadIntent(intent){
+        var me = this;
+        this.model.botController.hears([intent.ID], 'direct_message,direct_mention,mention', this._wit.hears, function(bot,message){
+            // Retrieve from wit.ai the recognized entities which matches with required ones
+            var entities = me.fillEntities(intent.entities, message.entities);
+            // Retrieve non found entities on user message
+            var nonFoundEntities = me.retrieveNonFoundEntities(entities);
+            // TODO Create handler for last element
+
+            // TODO Create handler for the rest of the elements
+
+            // TODO Start the bot
+        });
+    }
+    retrieveLastEntityHandler(entity){
+        return () => {
+            // TODO Ask Question
+
+            // TODO Retrieve response
+
+            // TODO Check if element exists in table (if not, send suggestions and re-ask)
+
+            // TODO Create query
+
+            // TODO Response with output
+        };
+    }
+
+    retrieveEntityHandler(entity){
+        return () => {
+            // TODO Ask question
+
+            // TODO Retrieve response
+
+            // TODO Check if element exists in table (if not, send suggestions and re-ask)
+
+            // TODO Call next handler
+        };
+    }
+
+
+
+
+    fillEntities(definedEntities, foundEntities) {
+        var remainEntities = JSON.parse(JSON.stringify(definedEntities));;
+        for(let i=0; i<remainEntities.length;i++){
+            if(foundEntities[definedEntities[i].column.toLowerCase()]){
+                remainEntities[i].value = foundEntities[definedEntities[i].column.toLowerCase()][0].value;
+                console.log("Found "+remainEntities[i].column+" value "+remainEntities[i].value);
+            }
+        }
+        return remainEntities;
+    }
+
+    retrieveNonFoundEntities(entities) {
+        var nonFoundEntities = [];
+        for(let i=0;i<entities.length;i++){
+            if(!entities[i].value){
+                nonFoundEntities.push(entities[i]);
+            }
+        }
+        return nonFoundEntities;
+    }
+
+    startBot(){
+        this.model.bot.startRTM(function(err,bot,payload) {
+            if (err) {
+                throw new Error('Could not connect to Slack');
+            }
+        });
+    }
+
+    loadGreetingsHandler(responseMessage) {
+        this.model.botController.hears(["greetings"], 'direct_message,direct_mention,mention', this._wit.hears, function(bot, message){
+            bot.reply(message, responseMessage);
+        });
     }
 }
 
