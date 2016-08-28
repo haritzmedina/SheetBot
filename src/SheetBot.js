@@ -157,14 +157,59 @@ class SheetBot{
                 // TODO Check if element exists in table (if not, send suggestions and re-ask)
                 if(me.checkValueExistsInDatabase(
                         currentEntity.column, userResponse, currentEntity.function, intent.sourceTable)){
-                    console.log('Element exists');
+                    // Create query
+                    me.fillEntity(currentEntity.column, userResponse, entities);
+                    let sqlQuery = me.createSQLQuery(entities, intent);
+                    console.log('Query: '+sqlQuery);
+                    // TODO Execute query
+                    var results = this.executeSQLQuery(sqlQuery);
+                    // TODO Prepare response
+                    var responses = this.parseQueryResults(results, intent.response);
+                    // TODO Response with output
+                    if(responses.length>0){
+                        for(let i=0;i<responses.length;i++){
+                            convo.say(responses[i]);
+                        }
+                    }
+                    else{
+                        if(intent.response.customNoResultsFoundMessage){
+                            convo.say(intent.response.customNoResultsFoundMessage);
+                        }
+                        else{
+                            convo.say("Results not found");
+                        }
+                    }
                 }
+                else{
+                    // TODO Repeat question
+                    //convo.ask(currentEntity.suggestionCustomMessage, me.retrieveRepeatQuestionHandler());
+                    console.log('Elements not exists');
+                }
+                // Finish answer processing
+                convo.next();
             });
-
-            // TODO Create query
-
-            // TODO Response with output
         };
+    }
+
+    retrieveRepeatQuestionHandler(currentEntity, entities, intent) {
+        var me = this;
+        return (response, convo) => {
+            // TODO Retrieve response
+            let userResponse = response.text;
+            // TODO Check if element exists in table (if not, send suggestions and re-ask)
+            if(me.checkValueExistsInDatabase(
+                    currentEntity.column, userResponse, currentEntity.function, intent.sourceTable)){
+                // TODO Create query
+
+                // TODO Response with output
+            }
+            else{
+                convo.ask(currentEntity.suggestionCustomMessage, me.retrieveRepeatQuestionHandler(currentEntity, entities, intent));
+                console.log('Elements not exists');
+            }
+            // Finish answer processing
+            convo.next();
+        }
     }
 
     retrieveEntityHandler(currentEntity, entities, intent, nextEntityCallback){
@@ -200,7 +245,6 @@ class SheetBot{
                 else{
                     convo.say("Results not found");
                 }
-
             }
             // Finish answer processing
             convo.next();
@@ -279,6 +323,14 @@ class SheetBot{
         return nonFoundEntities;
     }
 
+    fillEntity(column, value, entities){
+        for(let i=0;i<entities.length;i++){
+            if(entities[i].column.toLowerCase()===column.toLowerCase()){
+                entities[i].value = value;
+            }
+        }
+    }
+
     startBot(){
         this.model.bot.startRTM(function(err,bot,payload) {
             if (err) {
@@ -295,7 +347,7 @@ class SheetBot{
 
     checkEntitiesExistenceInDatabase(entities, sourceTable) {
         for(let i=0;i<entities.length;i++){
-            if(!this.checkValueExistsInDatabase(entities[i].column, entities[i].function, entities[i].value, sourceTable)){
+            if(!this.checkValueExistsInDatabase(entities[i].column, entities[i].value, entities[i].function, sourceTable)){
                 entities.value = null; // Remove user input value cause not exists in database (need to ask for it)
             }
         }
@@ -303,14 +355,14 @@ class SheetBot{
     }
 
     checkValueExistsInDatabase(column, value, operand, sourceTable) {
-        let whereCondition = this.whereConditionParsing(column, value, operand);
+        let whereCondition = this.whereConditionParsing(column, operand, value);
         let sqlQuery = this.parseQuery(
             'SELECT COUNT(*) AS number FROM %s WHERE %s',
             sourceTable,
             whereCondition);
         console.log(sqlQuery);
         let result = this.executeSQLQuery(sqlQuery);
-        return result.number > 0;
+        return result[0].number > 0;
     }
 
     parseQuery(str){
