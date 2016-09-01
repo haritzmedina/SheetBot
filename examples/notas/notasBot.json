@@ -28,13 +28,13 @@
       "entities": [{
         "column": "Alumno",
         "function": "LIKE",
-        "columnQuestion": "Dime tu nombre para obtener las notas de matemática. Como por ejemplo: ",
-        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por las notas de mate de: "
+        "columnQuestion": "Dime tu nombre para obtener las notas de matemática. Como por ejemplo:",
+        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por las notas de mate de:"
       }]
     },
     {
       "ID": "notasLenguaPorAlumno",
-      "sourceTable": "NotasMate",
+      "sourceTable": "NotasLengua",
       "response": {
         "outputColumn": "Parcial1, Parcial2, Parcial3",
         "showColumnName": true

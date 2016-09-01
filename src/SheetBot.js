@@ -7,10 +7,15 @@ class SheetBot{
         // Attributes
         this.model = this.model || {};
         this.model.tabularData = this.model.tabularData || {};
+        this.model.tabularData.gSheetAuthFile = gSheetAuthFile;
 
         // Initialization functions
         this.loadDependencies(tokenFile);
         this.loadSchema(gSheetAuthFile, schemaFile);
+
+        // Defined static values
+        this.params = {};
+        this.params.maxSuggestions = 7;
     }
 
     loadDependencies(tokenFile){
@@ -42,7 +47,7 @@ class SheetBot{
         this.model.schema = JSON.parse(this._fs.readFileSync(schemaFile, 'utf8'));
 
         // Load sheet data
-        this.initializeTabularData(gSheetAuthFile, this.model.schema.tabularData);
+        this.initializeTabularData(this.model.tabularData.gSheetAuthFile, this.model.schema.tabularData);
 
         // Load intents behaviour
         this.loadGreetingsHandler(this.model.schema.greetings);
@@ -56,23 +61,31 @@ class SheetBot{
 
     initializeTabularData(gsheetAuthFile, tabularData) {
         this.model.tabularData.raw = this.model.tabularData.raw || {};
-        var me = this;
         for(let tableSchema of tabularData){
-            GSheetManager.loadRawData(
-                gsheetAuthFile,
-                tableSchema.gSheetToken,
-                tableSchema.gSheetName,
-                tableSchema.gSheetRange,
-                (rawTable) => {
-                    var tabularMetadata = {
-                        'gSheetToken': tableSchema.gSheetToken,
-                        'gSheetName': tableSchema.gSheetName,
-                        'gSheetRange': tableSchema.gSheetRange,
-                    };
-                    me.updateRawData(tabularMetadata, rawTable);
-                }
-            );
+            this.updateTable(tableSchema);
         }
+    }
+
+    updateTable(tableSchema, callback){
+        var me = this;
+        GSheetManager.loadRawData(
+            this.model.tabularData.gSheetAuthFile,
+            tableSchema.gSheetToken,
+            tableSchema.gSheetName,
+            tableSchema.gSheetRange,
+            (rawTable) => {
+                var tabularMetadata = {
+                    'gSheetToken': tableSchema.gSheetToken,
+                    'gSheetName': tableSchema.gSheetName,
+                    'gSheetRange': tableSchema.gSheetRange,
+                    'tableName': tableSchema.tableName
+                };
+                me.updateRawData(tabularMetadata, rawTable);
+                if(callback && typeof callback==='function'){
+                    callback();
+                }
+            }
+        );
     }
 
     updateRawData(tabularMetadata, rawTable){
@@ -83,6 +96,7 @@ class SheetBot{
             this.model.tabularData.raw[tabularDataId] = rawTable;
             var formatedTable = this.formatRawTable(rawTable);
             this.updateAlaSQLTable(tabularMetadata.gSheetName, formatedTable);
+            console.log('Updated table: '+tabularMetadata.tableName);
         }
     }
 
@@ -123,92 +137,108 @@ class SheetBot{
             // Retrieve from wit.ai the recognized entities which matches with required ones
             var entities = me.fillEntities(intent.entities, message.entities);
             // Check if retrieved entities exists (or need to ask for them)
-            entities = me.checkEntitiesExistenceInDatabase(entities, intent.sourceTable);
-            // Retrieve non found entities on user message
-            var nonFoundEntities = me.retrieveNonFoundEntities(entities);
-            var initialResponseHandler = null; // TODO Define initial response handler
-            if(nonFoundEntities.length>0){
-                // TODO Create handler for last element
-                let currentElementHandler = me.retrieveLastEntityHandler(nonFoundEntities[0], entities, intent);
-                // TODO Create handler for the rest of the elements
-                for(let i=1;i<nonFoundEntities.length;i++){
-                    currentElementHandler = me.retrieveEntityHandler(
-                        nonFoundEntities[i], entities, intent, currentElementHandler);
+            me.checkEntitiesExistenceInDatabase(entities, intent.sourceTable, (entities) => {
+                // Retrieve non found entities on user message
+                var nonFoundEntities = me.retrieveNonFoundEntities(entities);
+                var initialResponseHandler = null; // TODO Define initial response handler
+                if(nonFoundEntities.length>0){
+                    // TODO Create handler for last element
+                    let currentElementHandler = me.retrieveLastEntityHandler(nonFoundEntities[0], entities, intent);
+                    // TODO Create handler for the rest of the elements
+                    for(let i=1;i<nonFoundEntities.length;i++){
+                        currentElementHandler = me.retrieveEntityHandler(
+                            nonFoundEntities[i], entities, intent, currentElementHandler);
+                    }
+                    initialResponseHandler = currentElementHandler;
                 }
-                initialResponseHandler = currentElementHandler;
-            }
-            else{
-                //TODO Define conversation handler with the response
-                initialResponseHandler = me.retrieveNoRequiredEntityHandler(entities, intent);
+                else{
+                    //TODO Define conversation handler with the response
+                    initialResponseHandler = me.retrieveNoRequiredEntityHandler(entities, intent);
 
-            }
-            // Start the conversation
-            bot.startConversation(message, initialResponseHandler);
+                }
+                // Start the conversation
+                bot.startConversation(message, initialResponseHandler);
+            });
         });
     }
 
     retrieveLastEntityHandler(currentEntity, entities, intent){
         var me = this;
+        var responseHandler = (currentEntity, userResponse, entities, intent, convo) => {
+            // Create query
+            me.fillEntity(currentEntity.column, userResponse, entities);
+            let sqlQuery = me.createSQLQuery(entities, intent);
+            // TODO Execute query
+            this.executeSQLQuery(sqlQuery, (results) => {
+                // TODO Prepare response
+                let responses = this.parseQueryResults(results, intent.response);
+                // TODO Response with output
+                if(responses.length>0){
+                    for(let i=0;i<responses.length;i++){
+                        convo.say(responses[i]);
+                    }
+                }
+                else{
+                    if(intent.response.customNoResultsFoundMessage){
+                        convo.say(intent.response.customNoResultsFoundMessage);
+                    }
+                    else{
+                        convo.say('Results not found');
+                    }
+                }
+                convo.next();
+            });
+        };
         return (response, convo) => {
             // TODO Ask Question
             convo.ask(currentEntity.columnQuestion, (response, convo) => {
                 // TODO Retrieve response
                 let userResponse = response.text;
                 // TODO Check if element exists in table (if not, send suggestions and re-ask)
-                if(me.checkValueExistsInDatabase(
-                        currentEntity.column, userResponse, currentEntity.function, intent.sourceTable)){
-                    // Create query
-                    me.fillEntity(currentEntity.column, userResponse, entities);
-                    let sqlQuery = me.createSQLQuery(entities, intent);
-                    console.log('Query: '+sqlQuery);
-                    // TODO Execute query
-                    var results = this.executeSQLQuery(sqlQuery);
-                    // TODO Prepare response
-                    var responses = this.parseQueryResults(results, intent.response);
-                    // TODO Response with output
-                    if(responses.length>0){
-                        for(let i=0;i<responses.length;i++){
-                            convo.say(responses[i]);
-                        }
-                    }
-                    else{
-                        if(intent.response.customNoResultsFoundMessage){
-                            convo.say(intent.response.customNoResultsFoundMessage);
+                me.checkValueExistsInDatabase(currentEntity.column, userResponse, currentEntity.function, intent.sourceTable,
+                    (exists) => {
+                        if(exists){
+                            responseHandler(currentEntity, userResponse, entities, intent, convo);
                         }
                         else{
-                            convo.say("Results not found");
+                            // TODO Repeat question
+                            me.prepareRepeatQuestion(currentEntity, intent.sourceTable, userResponse,
+                                (botRepeatQuestion) => {
+                                    convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
+                                        currentEntity, entities, intent, responseHandler
+                                    ));
+                                    convo.next();
+                                });
                         }
-                    }
-                }
-                else{
-                    // TODO Repeat question
-                    //convo.ask(currentEntity.suggestionCustomMessage, me.retrieveRepeatQuestionHandler());
-                    console.log('Elements not exists');
-                }
-                // Finish answer processing
-                convo.next();
+                    });
             });
         };
     }
 
-    retrieveRepeatQuestionHandler(currentEntity, entities, intent) {
+    retrieveRepeatQuestionHandler(currentEntity, entities, intent, responseCallback) {
         var me = this;
         return (response, convo) => {
             // TODO Retrieve response
             let userResponse = response.text;
             // TODO Check if element exists in table (if not, send suggestions and re-ask)
-            if(me.checkValueExistsInDatabase(
-                    currentEntity.column, userResponse, currentEntity.function, intent.sourceTable)){
-                // TODO Create query
-
-                // TODO Response with output
-            }
-            else{
-                convo.ask(currentEntity.suggestionCustomMessage, me.retrieveRepeatQuestionHandler(currentEntity, entities, intent));
-                console.log('Elements not exists');
-            }
-            // Finish answer processing
-            convo.next();
+            me.checkValueExistsInDatabase(
+                currentEntity.column, userResponse, currentEntity.function, intent.sourceTable,
+                (exists) => {
+                    if(exists){
+                        // Execute callback
+                        responseCallback(currentEntity, userResponse, entities, intent, convo);
+                    }
+                    else{
+                        console.log('Elements not exists');
+                        me.prepareRepeatQuestion(currentEntity, intent.sourceTable, userResponse,
+                            (botRepeatQuestion) => {
+                            convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
+                                currentEntity, entities, intent, responseCallback
+                            ));
+                            convo.next();
+                            });
+                    }
+                });
         }
     }
 
@@ -229,23 +259,24 @@ class SheetBot{
             // Create query
             var sqlQuery = this.createSQLQuery(entities, intent);
             // Execute query
-            var results = this.executeSQLQuery(sqlQuery);
-            // TODO Prepare response
-            var responses = this.parseQueryResults(results, intent.response);
-            // TODO Response with output
-            if(responses.length>0){
-                for(let i=0;i<responses.length;i++){
-                    convo.say(responses[i]);
-                }
-            }
-            else{
-                if(intent.response.customNoResultsFoundMessage){
-                    convo.say(intent.response.customNoResultsFoundMessage);
+            this.executeSQLQuery(sqlQuery, (results) => {
+                // TODO Prepare response
+                var responses = this.parseQueryResults(results, intent.response);
+                // TODO Response with output
+                if(responses.length>0){
+                    for(let i=0;i<responses.length;i++){
+                        convo.say(responses[i]);
+                    }
                 }
                 else{
-                    convo.say("Results not found");
+                    if(intent.response.customNoResultsFoundMessage){
+                        convo.say(intent.response.customNoResultsFoundMessage);
+                    }
+                    else{
+                        convo.say("Results not found");
+                    }
                 }
-            }
+            });
             // Finish answer processing
             convo.next();
         }
@@ -345,24 +376,36 @@ class SheetBot{
         });
     }
 
-    checkEntitiesExistenceInDatabase(entities, sourceTable) {
+    checkEntitiesExistenceInDatabase(entities, sourceTable, callback) {
+        let promises = [];
         for(let i=0;i<entities.length;i++){
-            if(!this.checkValueExistsInDatabase(entities[i].column, entities[i].value, entities[i].function, sourceTable)){
-                entities.value = null; // Remove user input value cause not exists in database (need to ask for it)
-            }
+            promises.push(new Promise((resolve, reject) => {
+                this.checkValueExistsInDatabase(entities[i].column, entities[i].value, entities[i].function, sourceTable,
+                    (exists) => {
+                        if(!exists){
+                            entities[i].value = null;
+                        }
+                        resolve();
+                    }
+                );
+            }));
         }
-        return entities;
+        Promise.all(promises).then(()=>{
+            callback(entities);
+        });
     }
 
-    checkValueExistsInDatabase(column, value, operand, sourceTable) {
+    checkValueExistsInDatabase(column, value, operand, sourceTable, callback) {
         let whereCondition = this.whereConditionParsing(column, operand, value);
         let sqlQuery = this.parseQuery(
             'SELECT COUNT(*) AS number FROM %s WHERE %s',
             sourceTable,
             whereCondition);
-        console.log(sqlQuery);
-        let result = this.executeSQLQuery(sqlQuery);
-        return result[0].number > 0;
+        this.executeSQLQuery(sqlQuery, (result) => {
+            if(callback && typeof callback==='function'){
+                callback(result[0].number > 0);
+            }
+        });
     }
 
     parseQuery(str){
@@ -374,8 +417,41 @@ class SheetBot{
         });
     }
 
-    executeSQLQuery(sqlQuery) {
-        return this.model.tabularData.alasql(sqlQuery);
+    executeSQLQuery(sqlQuery, callback) {
+        // Update tabular data if is async data
+        let queryTable = this.extractTableFromSQLQuery(sqlQuery);
+        let queryTableSchema = this.retrieveTableSchema(queryTable);
+        if(queryTableSchema){
+            this.updateTable(queryTableSchema, () => {
+                // Execute alasql query
+                if(callback && typeof callback==='function'){
+                    console.log('Executed SQL: '+sqlQuery);
+                    callback(this.model.tabularData.alasql(sqlQuery));
+                }
+            });
+        }
+    }
+
+    retrieveTableSchema(tableName){
+        for(let i=0;i<this.model.schema.tabularData.length;i++){
+            if(this.model.schema.tabularData[i].tableName===tableName){
+                return this.model.schema.tabularData[i];
+            }
+        }
+    }
+
+    extractTableFromSQLQuery(sqlQuery){
+        let re = /FROM\s+([^ ,]+)(?:\s*,\s*([^ ,]+))*\s*/;
+        let str = sqlQuery;
+        let m;
+        if ((m = re.exec(str)) !== null) {
+            if (m.index === re.lastIndex) {
+                re.lastIndex++;
+            }
+            // View your result using the m-variable.
+            // eg m[0] etc.
+        }
+        return m[1];
     }
 
     parseQueryResults(results, definedResponse) {
@@ -397,6 +473,46 @@ class SheetBot{
         }
         return responses;
 
+    }
+
+    prepareRepeatQuestion(currentEntity, sourceTable, userResponse, callback) {
+        // TODO Retrieve suggestions
+        this.retrieveSuggestions(currentEntity, sourceTable, userResponse, (suggestions) => {
+            // TODO Prepare message
+            if(callback && typeof callback==='function'){
+                let message = 'Not found. Try: ';
+                // If custom message is defined, set as message preface
+                if(currentEntity.suggestionCustomMessage){
+                    message = currentEntity.suggestionCustomMessage;
+                }
+                if(suggestions.length>0){
+                    for(let i=0;i<suggestions.length;i++){
+                        message += " "+suggestions[i]+",";
+                    }
+                    message = message.replace(/,$/, "") + ".";
+
+                }
+                callback(message);
+            }
+        });
+    }
+
+    retrieveSuggestions(currentEntity, sourceTable, userResponse, callback){
+        let sqlQuery = this.parseQuery(
+            'SELECT %s FROM %s',
+            currentEntity.column,
+            sourceTable);
+        console.log(sqlQuery);
+        var me = this;
+        this.executeSQLQuery(sqlQuery, (results) => {
+            let suggestions = [];
+            for(let i=0;i<me.params.maxSuggestions;i++){
+                if(results[i] && results[i][currentEntity.column]){
+                    suggestions.push(results[i][currentEntity.column]);
+                }
+            }
+            callback(suggestions);
+        });
     }
 }
 
