@@ -30,6 +30,11 @@
         "function": "LIKE",
         "columnQuestion": "Dime tu nombre para obtener las notas de matemática. Como por ejemplo:",
         "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por las notas de mate de:"
+      }, {
+        "column": "ID",
+        "function": "=",
+        "columnQuestion": "Dime tu ID:",
+        "suggestionCustomMessage": "No he encontrado ese ID. Prueba con:"
       }]
     },
     {

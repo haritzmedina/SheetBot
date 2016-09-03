@@ -189,19 +189,22 @@ class SheetBot{
                 convo.next();
             });
         };
-        return (response, convo) => {
+        return (response, convo, updatedEntities) => {
+            if(updatedEntities){
+                entities = updatedEntities;
+            }
             // TODO Ask Question
             convo.ask(currentEntity.columnQuestion, (response, convo) => {
-                // TODO Retrieve response
+                // Retrieve response
                 let userResponse = response.text;
-                // TODO Check if element exists in table (if not, send suggestions and re-ask)
+                // Check if element exists in table (if not, send suggestions and re-ask)
                 me.checkValueExistsInDatabase(currentEntity.column, userResponse, currentEntity.function, intent.sourceTable,
                     (exists) => {
                         if(exists){
                             responseHandler(currentEntity, userResponse, entities, intent, convo);
                         }
                         else{
-                            // TODO Repeat question
+                            // Repeat question
                             me.prepareRepeatQuestion(currentEntity, intent.sourceTable, userResponse,
                                 (botRepeatQuestion) => {
                                     convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
@@ -217,8 +220,12 @@ class SheetBot{
 
     retrieveRepeatQuestionHandler(currentEntity, entities, intent, responseCallback) {
         var me = this;
-        return (response, convo) => {
-            // TODO Retrieve response
+        return (response, convo, updatedEntities) => {
+            // Entities chaining
+            if(updatedEntities){
+                entities = updatedEntities;
+            }
+            // Retrieve response
             let userResponse = response.text;
             // TODO Check if element exists in table (if not, send suggestions and re-ask)
             me.checkValueExistsInDatabase(
@@ -243,14 +250,41 @@ class SheetBot{
     }
 
     retrieveEntityHandler(currentEntity, entities, intent, nextEntityCallback){
-        return () => {
-            // TODO Ask question
-
-            // TODO Retrieve response
-
-            // TODO Check if element exists in table (if not, send suggestions and re-ask)
-
-            // TODO Call next handler
+        var me = this;
+        var responseHandler = (currentEntity, response, entities, intent, convo) => {
+            // Create query
+            me.fillEntity(currentEntity.column, response, entities);
+            // Call next entity handler
+            nextEntityCallback(response, convo, entities);
+            convo.next();
+        };
+        return (response, convo, updatedEntities) => {
+            // Entities chaining
+            if(updatedEntities){
+                entities = updatedEntities;
+            }
+            // TODO Ask Question
+            convo.ask(currentEntity.columnQuestion, (response, convo) => {
+                // Retrieve response
+                let userResponse = response.text;
+                // Check if element exists in table (if not, send suggestions and re-ask)
+                me.checkValueExistsInDatabase(currentEntity.column, response.text, currentEntity.function, intent.sourceTable,
+                    (exists) => {
+                        if(exists){
+                            responseHandler(currentEntity, userResponse, entities, intent, convo);
+                        }
+                        else{
+                            // Prepare question to repeat
+                            me.prepareRepeatQuestion(currentEntity, intent.sourceTable, userResponse,
+                                (botRepeatQuestion) => {
+                                    convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
+                                        currentEntity, entities, intent, responseHandler
+                                    ));
+                                    convo.next();
+                                });
+                        }
+                    });
+            });
         };
     }
 
@@ -285,9 +319,12 @@ class SheetBot{
     createSQLQuery(entities, intent){
         // Construct where condition based on entities
         let whereCondition = "";
-        for(let i=0;i<entities.length;i++){
-            whereCondition += " "+this.whereConditionParsing(entities[i].column, entities[i].function, entities[i].value);
+        // Create where condition with AND operand
+        for(let i=0;i<entities.length-1;i++){
+            whereCondition += " "+this.whereConditionParsing(entities[i].column, entities[i].function, entities[i].value)+" AND";
         }
+        // Create last condition of where
+        whereCondition += " "+this.whereConditionParsing(entities[entities.length-1].column, entities[entities.length-1].function, entities[entities.length-1].value);
         let sqlQuery = this.parseQuery('SELECT %s FROM %s WHERE %s',
             intent.response.outputColumn,
             intent.sourceTable,
@@ -475,12 +512,34 @@ class SheetBot{
 
     }
 
-    prepareRepeatQuestion(currentEntity, sourceTable, userResponse, callback) {
-        // TODO Retrieve suggestions
+    prepareQuestion(currentEntity, sourceTable, userResponse, callback){
+        // Retrieve suggestions
         this.retrieveSuggestions(currentEntity, sourceTable, userResponse, (suggestions) => {
-            // TODO Prepare message
+            // Prepare message
             if(callback && typeof callback==='function'){
-                let message = 'Not found. Try: ';
+                let message = 'Set column '+currentEntity.column+' value, for example:';
+                // If custom message is defined, set as message preface
+                if(currentEntity.columnQuestion){
+                    message = currentEntity.columnQuestion;
+                }
+                if(suggestions.length>0){
+                    for(let i=0;i<suggestions.length;i++){
+                        message += " "+suggestions[i]+",";
+                    }
+                    message = message.replace(/,$/, "") + ".";
+
+                }
+                callback(message);
+            }
+        });
+    }
+
+    prepareRepeatQuestion(currentEntity, sourceTable, userResponse, callback) {
+        // Retrieve suggestions
+        this.retrieveSuggestions(currentEntity, sourceTable, userResponse, (suggestions) => {
+            // Prepare message
+            if(callback && typeof callback==='function'){
+                let message = 'Value not found. Try:';
                 // If custom message is defined, set as message preface
                 if(currentEntity.suggestionCustomMessage){
                     message = currentEntity.suggestionCustomMessage;
