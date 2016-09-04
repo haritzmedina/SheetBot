@@ -30,11 +30,6 @@
         "function": "LIKE",
         "columnQuestion": "Dime tu nombre para obtener las notas de matemática. Como por ejemplo:",
         "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por las notas de mate de:"
-      }, {
-        "column": "ID",
-        "function": "=",
-        "columnQuestion": "Dime tu ID:",
-        "suggestionCustomMessage": "No he encontrado ese ID. Prueba con:"
       }]
     },
     {
@@ -62,8 +57,8 @@
       "entities": [{
         "column": "Alumno",
         "function": "LIKE",
-        "columnQuestion": "Dime tu nombre para obtener las notas medias de matemática",
-        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por la nota medias de mate de: "
+        "columnQuestion": "Dime tu nombre para obtener las notas medias de matemática. Por ejemplo:",
+        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por la nota medias de mate de:"
       }]
     },
     {
@@ -72,14 +67,13 @@
       "response": {
         "outputColumn": "Alumno, (Parcial1+Parcial2+Parcial3)/3 AS Media",
         "numberOfResponses": 1,
-        "customResponseStructure": ["La media de %s en lengua es %s", "Alumno", "Media"],
-        "showColumnName": true
+        "customResponseStructure": ["La media de %s en lengua es %s", "Alumno", "Media"]
       },
       "entities": [{
         "column": "Alumno",
         "function": "LIKE",
-        "columnQuestion": "Dime tu nombre para obtener la nota media del alumno",
-        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por la nota media de lengua de: "
+        "columnQuestion": "Dime tu nombre para obtener la nota media del alumno en lengua. Por ejemplo:",
+        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por la nota media de lengua de:"
       }]
     }
   ]
