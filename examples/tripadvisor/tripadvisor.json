@@ -1,0 +1,29 @@
+{
+  "description": "This bot will help you retrieving",
+  "greetings": "Hola! Soy notasbot y te ayudaré a obtener tus calificaciones. Prueba preguntandome por tus notas de matematica o lengua",
+  "tabularData": [
+    {
+      "gSheetToken": "1LQxk0GCHnPCdSzIRaiMJwUIWuI5HTvbncs8KCjoyAUM",
+      "gSheetName": "Restaurants",
+      "gSheetRange": "A1:Q417",
+      "tableName": "Restaurants"
+    }
+  ],
+  "intents": [
+    {
+      "ID": "restaurantInfoPerCuisine",
+      "sourceTable": "Restaurants",
+      "response": {
+        "outputColumn": "Name, RangePrice, Name_link",
+        "numberOfResponses": 5,
+        "showColumnName": true
+      },
+      "entities": [{
+        "column": "Cuisines",
+        "function": "LIKE",
+        "columnQuestion": "Which type of cuisine would you like? For example:",
+        "suggestionCustomMessage": "Cuisine style not found, try with:"
+      }]
+    }
+  ]
+}

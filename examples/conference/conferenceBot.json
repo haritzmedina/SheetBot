@@ -1,30 +1,37 @@
 {
-  "description": "This bot will help you .",
-  "greetings": "Hola! Soy notasbot y te ayudaré a obtener tus calificaciones. Prueba preguntandome por tus notas de matematica o lengua",
+  "description": "This bot helps you to retrieve information related with the WISE 2015 conference",
+  "greetings": "This bot helps you to retrieve information related with the WISE 2015 conference. Try typing 'Show me sessions'.",
   "tabularData": [
     {
-      "gSheetToken": "1Kp1mNaG8K6lG_DPh906hX__pY234DWpR8S357UGlxYw",
-      "gSheetName": "NotasLengua",
-      "gSheetRange": "A1:E4",
-      "tableName": "NotasLengua"
+      "gSheetToken": "1LQxk0GCHnPCdSzIRaiMJwUIWuI5HTvbncs8KCjoyAUM",
+      "gSheetName": "Schema",
+      "gSheetRange": "A1:F22",
+      "tableName": "Schedules"
     }
   ],
   "intents": [
     {
-      "ID": "notasMatePorAlumno",
-      "sourceTable": "NotasMate",
+      "ID": "retrieveSessionsPerSlot",
+      "sourceTable": "Schedules",
       "response": {
-        "outputColumn": "Parcial1, Parcial2, Parcial3",
+        "outputColumn": "Session1, Session2, Session3, Session4",
         "numberOfResponses": 1,
-        "customNoResultsFoundMessage": "No se han encontrado notas para el alumno.",
+        "customNoResultsFoundMessage": "Sessions not found for this slot",
         "showColumnName": true
       },
-      "entities": [{
-        "column": "Alumno",
-        "function": "LIKE",
-        "columnQuestion": "Dime tu nombre para obtener las notas de matemática. Como por ejemplo:",
-        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por las notas de mate de:"
-      }]
+      "entities": [
+        {
+          "column": "Slot",
+          "function": "LIKE",
+          "columnQuestion": "Choose a slot, for example:",
+          "suggestionCustomMessage": "Slot not found, try another one:"
+        },
+        {
+          "column": "Day",
+          "function": "LIKE",
+          "columnQuestion": "Please choose one day. For example:",
+          "suggestionCustomMessage": "Day not found. Try with another one:"
+        }]
     }
   ]
 }

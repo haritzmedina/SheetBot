@@ -96,7 +96,7 @@ class SheetBot{
             // If changed, update raw data and reprocess alaSQL table
             this.model.tabularData.raw[tabularDataId] = rawTable;
             var formatedTable = this.formatRawTable(rawTable);
-            this.updateAlaSQLTable(tabularMetadata.gSheetName, formatedTable);
+            this.updateAlaSQLTable(tabularMetadata.tableName, formatedTable);
             console.log('Updated table: '+tabularMetadata.tableName);
         }
     }
@@ -164,7 +164,7 @@ class SheetBot{
                 if(nonFoundEntities.length>0){
                     // Create handler for last element
                     let currentElementHandler = me.retrieveLastEntityHandler(nonFoundEntities[0], entities, intent);
-                    // TODO Create handler for the rest of the elements
+                    // Create handler for the rest of the elements
                     for(let i=1;i<nonFoundEntities.length;i++){
                         currentElementHandler = me.retrieveEntityHandler(
                             nonFoundEntities[i], entities, intent, currentElementHandler);
@@ -172,7 +172,7 @@ class SheetBot{
                     initialResponseHandler = currentElementHandler;
                 }
                 else{
-                    //TODO Define conversation handler with the response
+                    // Define conversation handler with the response
                     initialResponseHandler = me.retrieveNoRequiredEntityHandler(entities, intent);
 
                 }
@@ -190,7 +190,7 @@ class SheetBot{
             // Create query
             me.fillEntity(currentEntity.column, userResponse, entities);
             let sqlQuery = me.createSQLQuery(entities, intent);
-            // TODO Execute query
+            // Execute query
             this.executeSQLQuery(sqlQuery, (results) => {
                 // Parse responses
                 let responses = me.prepareIntentResponses(results, intent);
@@ -206,7 +206,7 @@ class SheetBot{
             if(updatedEntities){
                 entities = updatedEntities;
             }
-            // TODO Ask Question
+            // Ask Question
             me.prepareQuestion(currentEntity, intent.sourceTable, (botQuestion) => {
                 convo.ask(botQuestion, (response, convo) => {
                     // Retrieve response
@@ -243,7 +243,7 @@ class SheetBot{
             }
             // Retrieve response
             let userResponse = response.text;
-            // TODO Check if element exists in table (if not, send suggestions and re-ask)
+            // Check if element exists in table (if not, send suggestions and re-ask)
             me.checkValueExistsInDatabase(
                 currentEntity.column, userResponse, currentEntity.function, intent.sourceTable,
                 (exists) => {
@@ -279,7 +279,7 @@ class SheetBot{
             if(updatedEntities){
                 entities = updatedEntities;
             }
-            // TODO Ask Question
+            // Ask Question
             me.prepareQuestion(currentEntity, intent.sourceTable, (botQuestion) => {
                 convo.ask(botQuestion, (response, convo) => {
                     // Retrieve response
@@ -327,9 +327,9 @@ class SheetBot{
 
     prepareIntentResponses(results, intent){
         let resultMessages = [];
-        // TODO Prepare response
+        // Prepare response
         let responses = this.parseQueryResults(results, intent.response);
-        // TODO Response with output
+        // Response with output
         if(responses.length>0){
             for(let i=0;i<responses.length;i++){
                 resultMessages.push(responses[i]);
@@ -484,15 +484,6 @@ class SheetBot{
         });
     }
 
-    parseStringArgs(str){
-        var args = [].slice.call(arguments, 1),
-            i = 0;
-
-        return str.replace(/%s/g, function() {
-            return args[i++];
-        });
-    }
-
     parseStringArray(strArray){
         return this.parseQuery.apply(null, strArray);
     }
@@ -620,7 +611,7 @@ class SheetBot{
     retrieveSuggestions(currentEntity, sourceTable, userResponse, callback){
         // TODO Check in different way depending on userResponse value (give different suggestions)
         let sqlQuery = this.parseQuery(
-            'SELECT %s FROM %s',
+            'SELECT DISTINCT %s FROM %s',
             currentEntity.column,
             sourceTable);
         var me = this;
