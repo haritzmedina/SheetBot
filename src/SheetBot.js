@@ -229,6 +229,7 @@ class SheetBot{
                             }
                         });
                 });
+                convo.next();
             });
 
         };
@@ -272,7 +273,6 @@ class SheetBot{
             me.fillEntity(currentEntity.column, response, entities);
             // Call next entity handler
             nextEntityCallback(response, convo, entities);
-            convo.next();
         };
         return (response, convo, updatedEntities) => {
             // Entities chaining
