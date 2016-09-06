@@ -128,7 +128,7 @@ class SheetBot{
             // If data is a number it converts automatically to a number
             let cellNumberIntent = Number(rawCell);
             if(isNaN(cellNumberIntent)){
-                return rawCell
+                return rawCell;
             }
             // Else maintains as a string
             else{
@@ -263,7 +263,7 @@ class SheetBot{
                             });
                     }
                 });
-        }
+        };
     }
 
     retrieveEntityHandler(currentEntity, entities, intent, nextEntityCallback){
@@ -322,7 +322,7 @@ class SheetBot{
                 // Finish answer process
                 convo.next();
             });
-        }
+        };
     }
 
     prepareIntentResponses(results, intent){
@@ -348,13 +348,13 @@ class SheetBot{
 
     createSQLQuery(entities, intent){
         // Construct where condition based on entities
-        let whereCondition = "";
+        let whereCondition = '';
         // Create where condition with AND operand
         for(let i=0;i<entities.length-1;i++){
-            whereCondition += " "+this.whereConditionParsing(entities[i].column, entities[i].function, entities[i].value)+" AND";
+            whereCondition += ' '+this.whereConditionParsing(entities[i].column, entities[i].function, entities[i].value)+' AND';
         }
         // Create last condition of where
-        whereCondition += " "+this.whereConditionParsing(entities[entities.length-1].column, entities[entities.length-1].function, entities[entities.length-1].value);
+        whereCondition += ' '+this.whereConditionParsing(entities[entities.length-1].column, entities[entities.length-1].function, entities[entities.length-1].value);
         let sqlQuery = this.parseQuery('SELECT %s FROM %s WHERE %s',
             intent.response.outputColumn,
             intent.sourceTable,
@@ -364,48 +364,48 @@ class SheetBot{
 
     whereConditionParsing(column, operand, value){
         const parsingMethods = {
-            "LIKE" : (value) => {
-                return "\"%"+value+"%\"";
+            'LIKE' : (value) => {
+                return '"%'+value+'%"';
             },
-            "=" : (value) => {
-                return  "\""+value+"\"";
+            '=' : (value) => {
+                return  '"'+value+'"';
             },
-            "!=": (value) => {
-                return  "\""+value+"\"";
+            '!=': (value) => {
+                return  '"'+value+'"';
             },
-            ">": (value) => {
-                return  "\""+value+"\"";
+            '>': (value) => {
+                return  '"'+value+'"';
             },
-            ">=": (value) => {
-                return  "\""+value+"\"";
+            '>=': (value) => {
+                return  '"'+value+'"';
             },
-            "<": (value) => {
-                return  "\""+value+"\"";
+            '<': (value) => {
+                return  '"'+value+'"';
             },
-            "<=": (value) => {
-                return  "\""+value+"\"";
+            '<=': (value) => {
+                return  '"'+value+'"';
             },
-            "!<": (value) => {
-                return  "\""+value+"\"";
+            '!<': (value) => {
+                return  '"'+value+'"';
             },
-            "!>": (value) => {
-                return  "\""+value+"\"";
+            '!>': (value) => {
+                return  '"'+value+'"';
             }
         };
         if(parsingMethods[operand]){
-            return column+" "+operand+" "+parsingMethods[operand](value);
+            return column+' '+operand+' '+parsingMethods[operand](value);
         }
         else{
-            return column+" = "+value;
+            return column+' = '+value;
         }
     }
 
     fillEntities(definedEntities, foundEntities) {
-        var remainEntities = JSON.parse(JSON.stringify(definedEntities));;
+        var remainEntities = JSON.parse(JSON.stringify(definedEntities));
         for(let i=0; i<remainEntities.length;i++){
             if(foundEntities[definedEntities[i].column.toLowerCase()]){
                 remainEntities[i].value = foundEntities[definedEntities[i].column.toLowerCase()][0].value;
-                console.log("Found entity "+remainEntities[i].column+" with value "+remainEntities[i].value);
+                console.log('Found entity '+remainEntities[i].column+' with value '+remainEntities[i].value);
             }
         }
         return remainEntities;
@@ -430,7 +430,7 @@ class SheetBot{
     }
 
     startBot(){
-        this.model.bot.startRTM(function(err,bot,payload) {
+        this.model.bot.startRTM(function(err) {
             if (err) {
                 throw new Error('Could not connect to Slack');
             }
@@ -438,7 +438,7 @@ class SheetBot{
     }
 
     loadGreetingsHandler(responseMessage) {
-        this.model.botController.hears(["greetings"], 'direct_message,direct_mention,mention', this._wit.hears, function(bot, message){
+        this.model.botController.hears(['greetings'], 'direct_message,direct_mention,mention', this._wit.hears, function(bot, message){
             bot.reply(message, responseMessage);
         });
     }
@@ -446,7 +446,7 @@ class SheetBot{
     checkEntitiesExistenceInDatabase(entities, sourceTable, callback) {
         let promises = [];
         for(let i=0;i<entities.length;i++){
-            promises.push(new Promise((resolve, reject) => {
+            promises.push(new Promise((resolve) => {
                 this.checkValueExistsInDatabase(entities[i].column, entities[i].value, entities[i].function, sourceTable,
                     (exists) => {
                         if(!exists){
@@ -545,14 +545,14 @@ class SheetBot{
                     responses.push(this.parseStringArray(responseStructureArray));
                 }
                 else{
-                    let response = "";
+                    let response = '';
                     let outputColumns = Object.keys(results[i]);
                     for(let j=0;j<outputColumns.length;j++){
                         if(definedResponse.showColumnName){
-                            response += outputColumns[j]+": "+results[i][outputColumns[j]]+"\n";
+                            response += outputColumns[j]+': '+results[i][outputColumns[j]]+'\n';
                         }
                         else{
-                            response += results[i][outputColumns[j]]+"\n";
+                            response += results[i][outputColumns[j]]+'\n';
                         }
                     }
                     responses.push(response);
@@ -601,9 +601,9 @@ class SheetBot{
         let parsedMessage = message;
         if(suggestions.length>0){
             for(let i=0;i<suggestions.length;i++){
-                parsedMessage += " "+suggestions[i]+",";
+                parsedMessage += ' '+suggestions[i]+',';
             }
-            parsedMessage = parsedMessage.replace(/,$/, "") + ".";
+            parsedMessage = parsedMessage.replace(/,$/, '') + '.';
         }
         return parsedMessage;
     }
