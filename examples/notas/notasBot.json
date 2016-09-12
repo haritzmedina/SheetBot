@@ -5,14 +5,12 @@
     {
       "gSheetToken": "1Kp1mNaG8K6lG_DPh906hX__pY234DWpR8S357UGlxYw",
       "gSheetName": "NotasLengua",
-      "gSheetRange": "A1:E4",
-      "tableName": "NotasLengua"
+      "gSheetRange": "A1:E4"
     },
     {
       "gSheetToken": "1Kp1mNaG8K6lG_DPh906hX__pY234DWpR8S357UGlxYw",
       "gSheetName": "NotasMate",
-      "gSheetRange": "A1:E4",
-      "tableName": "NotasMate"
+      "gSheetRange": "A1:E4"
     }
   ],
   "intents": [
@@ -29,7 +27,7 @@
         "column": "Alumno",
         "function": "LIKE",
         "columnQuestion": "Dime tu nombre para obtener las notas de matemática. Como por ejemplo:",
-        "suggestionCustomMessage": "No he encontrado ese alumno. Podrías preguntar por las notas de mate de:"
+        "suggestionCustomMessage": "Lo siento, no he encontrado ese alumno. Podrías preguntar por las notas de mate de:"
       }]
     },
     {

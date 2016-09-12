@@ -5,8 +5,7 @@
     {
       "gSheetToken": "1LQxk0GCHnPCdSzIRaiMJwUIWuI5HTvbncs8KCjoyAUM",
       "gSheetName": "Restaurants",
-      "gSheetRange": "A1:Q417",
-      "tableName": "Restaurants"
+      "gSheetRange": "A1:Q417"
     }
   ],
   "intents": [
@@ -16,7 +15,7 @@
       "response": {
         "outputColumn": "Name, RangePrice, Cuisines, Name_link",
         "numberOfResponses": 3,
-        "customResponseStructure": ["The %s restaurant has %s food and it cost between %s. More info via: %s",
+        "customResponseStructure": ["The '%s' restaurant has %s food and it cost between %s. More info via: %s",
           "Name", "Cuisines", "RangePrice", "Name_link"]
       },
       "entities": [{

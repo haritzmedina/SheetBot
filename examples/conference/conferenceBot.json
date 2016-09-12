@@ -1,12 +1,11 @@
 {
-  "description": "This bot helps you to retrieve information related with the WISE 2015 conference",
-  "greetings": "This bot helps you to retrieve information related with the WISE 2015 conference. Try typing 'Show me sessions'.",
+  "description": "WISE conference sessions related bot.",
+  "greetings": "This bot helps you to retrieve information related with the WISE 2015 conference. Try typing 'Show sessions'.",
   "tabularData": [
     {
       "gSheetToken": "1LQxk0GCHnPCdSzIRaiMJwUIWuI5HTvbncs8KCjoyAUM",
-      "gSheetName": "Schema",
-      "gSheetRange": "A1:F22",
-      "tableName": "Schedules"
+      "gSheetName": "Schedules",
+      "gSheetRange": "A1:F22"
     }
   ],
   "intents": [

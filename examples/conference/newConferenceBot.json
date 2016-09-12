@@ -1,0 +1,38 @@
+{
+  "sheets": [
+    {
+      "gSheetName": "Schedules",
+      "gSheetRange": "A1:F22"
+    }
+  ],
+  "chat":{
+    "description": "WISE conference sessions related bot.",
+    "greetings": "This bot helps you to retrieve information related with the WISE 2015 conference. Try typing 'Show sessions'.",
+    "intents": [
+      {
+        "ID": "retrieveSessionsPerSlot",
+        "sourceSheet": "Schedules",
+        "response": {
+          "outputColumn": "Session1, Session2, Session3, Session4",
+          "numberOfResponses": 1,
+          "notFoundMessage": "Sessions not found for this slot",
+          "showColumnName": true
+        },
+        "entities": [
+          {
+            "inputColumn": "Slot",
+            "mask": "LIKE",
+            "entityMissingMessage": "Choose a slot, for example:",
+            "entityNotFoundMessage": "Slot not found, try another one:"
+          },
+          {
+            "column": "Day",
+            "function": "LIKE",
+            "entityMissingMessage": "Please choose one day. For example:",
+            "entityNotFoundMessage": "Day not found. Try with another one:"
+          }
+        ]
+      }
+    ]
+  }
+}

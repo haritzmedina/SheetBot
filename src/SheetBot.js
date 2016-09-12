@@ -11,7 +11,7 @@ class SheetBot{
 
         // Initialization functions
         this.loadDependencies(tokenFile);
-        this.loadSchema(gSheetAuthFile, schemaFile);
+        this.loadSchema(schemaFile);
 
         // Defined static values
         this.params = {};
@@ -27,7 +27,6 @@ class SheetBot{
 
         this._Botkit = require('botkit');
         this._fs = require('fs');
-        this._readline = require('readline');
         this._wit = require('botkit-middleware-witai')({
             token: this._configuration.get('onekin.witai.token')
         });
@@ -43,7 +42,7 @@ class SheetBot{
         this.model.tabularData.alasql = require('alasql');
     }
 
-    loadSchema(gSheetAuthFile, schemaFile){
+    loadSchema(schemaFile){
         // Read file
         this.model.schema = JSON.parse(this._fs.readFileSync(schemaFile, 'utf8'));
 
@@ -78,8 +77,7 @@ class SheetBot{
                 var tabularMetadata = {
                     'gSheetToken': tableSchema.gSheetToken,
                     'gSheetName': tableSchema.gSheetName,
-                    'gSheetRange': tableSchema.gSheetRange,
-                    'tableName': tableSchema.tableName
+                    'gSheetRange': tableSchema.gSheetRange
                 };
                 me.updateRawData(tabularMetadata, rawTable);
                 if(callback && typeof callback==='function'){
@@ -96,8 +94,8 @@ class SheetBot{
             // If changed, update raw data and reprocess alaSQL table
             this.model.tabularData.raw[tabularDataId] = rawTable;
             var formatedTable = this.formatRawTable(rawTable);
-            this.updateAlaSQLTable(tabularMetadata.tableName, formatedTable);
-            console.log('Updated table: '+tabularMetadata.tableName);
+            this.updateAlaSQLTable(tabularMetadata.gSheetName, formatedTable);
+            console.log('Updated table: '+tabularMetadata.gSheetName);
         }
     }
 
@@ -506,7 +504,7 @@ class SheetBot{
 
     retrieveTableSchema(tableName){
         for(let i=0;i<this.model.schema.tabularData.length;i++){
-            if(this.model.schema.tabularData[i].tableName===tableName){
+            if(this.model.schema.tabularData[i].gSheetName===tableName){
                 return this.model.schema.tabularData[i];
             }
         }
