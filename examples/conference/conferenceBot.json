@@ -31,6 +31,23 @@
           "columnQuestion": "Please choose one day. For example:",
           "suggestionCustomMessage": "Day not found. Try with another one:"
         }]
+    },
+    {
+      "ID": "retrieveSlotByTopic",
+      "sourceTable": "Schedules",
+      "response": {
+        "outputColumn": "Day, Slot",
+        "customNoResultsFoundMessage": "Events not found",
+        "numberOfResponses": 5,
+        "customResponseStructure": ["An event at %s on %s is scheduled.", "Slot", "Day"]
+      },
+      "entities": [
+        {
+          "column": ["Session1", "Session2", "Session3", "Session4"],
+          "function": "LIKE",
+          "columnQuestion": "Search for a topic, room or chairman, for example:",
+          "suggestionCustomMessage": "Topic, room or chairman not found, try another one:"
+        }]
     }
   ]
 }

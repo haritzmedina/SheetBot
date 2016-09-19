@@ -123,12 +123,12 @@ class SheetBot{
             return '';
         }
         else{
-            // If data is a number it converts automatically to a number
+            // If data conversion to an integer is NaN, then is a string
             let cellNumberIntent = Number(rawCell);
             if(isNaN(cellNumberIntent)){
-                return rawCell;
+                return rawCell.replace(/(\r\n|\n|\r)/gm," "); // Remove newline characters
             }
-            // Else maintains as a string
+            // If data isn't NaN then is a pure integer, so it will be treated as integer
             else{
                 return cellNumberIntent;
             }
@@ -390,18 +390,34 @@ class SheetBot{
                 return  '"'+value+'"';
             }
         };
-        if(parsingMethods[operand]){
-            return column+' '+operand+' '+parsingMethods[operand](value);
+        // For OR Entities
+        if(Array.isArray(column)){
+            let whereCondition = '';
+            for(let i=0;i<column.length;i++){
+                whereCondition += column[i]+' '+operand+' '+parsingMethods[operand](value)+' AND '+column[i]+'<>"" OR ';
+            }
+            return whereCondition.slice(0, -3);
         }
         else{
-            return column+' = '+value;
+            if(parsingMethods[operand]){
+                return column+' '+operand+' '+parsingMethods[operand](value)+' AND '+column+'<>""';
+            }
+            else{
+                return column+' = '+value;
+            }
         }
     }
 
     fillEntities(definedEntities, foundEntities) {
         var remainEntities = JSON.parse(JSON.stringify(definedEntities));
         for(let i=0; i<remainEntities.length;i++){
-            if(foundEntities[definedEntities[i].column.toLowerCase()]){
+            if(Array.isArray(definedEntities[i].column)){
+                if(foundEntities[definedEntities[i].column[0].toLowerCase()]){
+                    remainEntities[i].value = foundEntities[definedEntities[i].column[0].toLowerCase()][0].value;
+                    console.log('Found multi-column entity '+remainEntities[i].column[0]+' with value '+remainEntities[i].value);
+                }
+            }
+            else if(foundEntities[definedEntities[i].column.toLowerCase()]){
                 remainEntities[i].value = foundEntities[definedEntities[i].column.toLowerCase()][0].value;
                 console.log('Found entity '+remainEntities[i].column+' with value '+remainEntities[i].value);
             }
@@ -608,16 +624,23 @@ class SheetBot{
 
     retrieveSuggestions(currentEntity, sourceTable, userResponse, callback){
         // TODO Check in different way depending on userResponse value (give different suggestions)
+        let targetColumn = null;
+        if(Array.isArray(currentEntity.column)){
+            targetColumn = currentEntity.column[0];
+        }
+        else{
+            targetColumn = currentEntity.column;
+        }
         let sqlQuery = this.parseQuery(
             'SELECT DISTINCT %s FROM %s',
-            currentEntity.column,
+            targetColumn,
             sourceTable);
         var me = this;
         this.executeSQLQuery(sqlQuery, (results) => {
             let suggestions = [];
             for(let i=0;i<me.params.maxSuggestions;i++){
-                if(results[i] && results[i][currentEntity.column]){
-                    suggestions.push(results[i][currentEntity.column]);
+                if(results[i] && results[i][targetColumn]){
+                    suggestions.push(results[i][targetColumn]);
                 }
             }
             if(callback && typeof callback==='function'){

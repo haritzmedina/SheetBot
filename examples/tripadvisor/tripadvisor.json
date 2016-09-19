@@ -1,11 +1,11 @@
 {
   "description": "This bot will help you retrieving restaurants near Miami",
-  "greetings": "This bot will help you retrieving restaurants near Miami. Try asking for food type.",
+  "greetings": "Hey! This bot will help you retrieving restaurants near Miami. Try asking for food type or price.",
   "tabularData": [
     {
       "gSheetToken": "1LQxk0GCHnPCdSzIRaiMJwUIWuI5HTvbncs8KCjoyAUM",
       "gSheetName": "Restaurants",
-      "gSheetRange": "A1:Q417"
+      "gSheetRange": "A1:S417"
     }
   ],
   "intents": [

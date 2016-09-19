@@ -10,6 +10,23 @@
     "greetings": "This bot helps you to retrieve information related with the WISE 2015 conference. Try typing 'Show sessions'.",
     "intents": [
       {
+        "ID": "retrieveSlotByTopic",
+        "sourceSheet": "Schedules",
+        "response": {
+          "outputColumn": "Day, Slot",
+          "notFoundMessage": "Events not found",
+          "numberOfResponses": 5,
+          "customResponseStructure": ["An event at %s on %s is scheduled.", "Slot", "Day"]
+        },
+        "entities": [
+          {
+            "inputColumn": ["Session1", "Session2", "Session3", "Session4"],
+            "mask": "LIKE",
+            "entityMissingMessage": "Search for a topic, room or chairman, for example:",
+            "entityNotFoundMessage": "Topic, room or chairman not found, try another one:"
+          }]
+      },
+      {
         "ID": "retrieveSessionsPerSlot",
         "sourceSheet": "Schedules",
         "response": {
