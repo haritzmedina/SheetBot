@@ -43,8 +43,8 @@
             "entityNotFoundMessage": "Slot not found, try another one:"
           },
           {
-            "column": "Day",
-            "function": "LIKE",
+            "inputColumn": "Day",
+            "mask": "LIKE",
             "entityMissingMessage": "Please choose one day. For example:",
             "entityNotFoundMessage": "Day not found. Try with another one:"
           }

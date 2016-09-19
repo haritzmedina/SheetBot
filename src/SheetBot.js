@@ -47,11 +47,11 @@ class SheetBot{
         this.model.schema = JSON.parse(this._fs.readFileSync(schemaFile, 'utf8'));
 
         // Load sheet data
-        this.initializeTabularData(this.model.tabularData.gSheetAuthFile, this.model.schema.tabularData);
+        this.initializeTabularData(this.model.tabularData.gSheetAuthFile, this.model.schema.sheets);
 
         // Load intents behaviour
-        this.loadGreetingsHandler(this.model.schema.greetings);
-        this.loadIntents(this.model.schema.intents);
+        this.loadGreetingsHandler(this.model.schema.chat.greetings);
+        this.loadIntents(this.model.schema.chat.intents);
     }
 
     loadConfiguration(tokenFile){
@@ -70,12 +70,12 @@ class SheetBot{
         var me = this;
         GSheetManager.loadRawData(
             this.model.tabularData.gSheetAuthFile,
-            tableSchema.gSheetToken,
+            this._configuration.get('onekin.gsheet.url'),
             tableSchema.gSheetName,
             tableSchema.gSheetRange,
             (rawTable) => {
                 var tabularMetadata = {
-                    'gSheetToken': tableSchema.gSheetToken,
+                    'gSheetToken': this._configuration.get('onekin.gsheet.url'),
                     'gSheetName': tableSchema.gSheetName,
                     'gSheetRange': tableSchema.gSheetRange
                 };
@@ -155,7 +155,7 @@ class SheetBot{
             // Retrieve from wit.ai the recognized entities which matches with required ones
             var entities = me.fillEntities(intent.entities, message.entities);
             // Check if retrieved entities exists (or need to ask for them)
-            me.checkEntitiesExistenceInDatabase(entities, intent.sourceTable, (entities) => {
+            me.checkEntitiesExistenceInDatabase(entities, intent.sourceSheet, (entities) => {
                 // Retrieve non found entities on user message
                 var nonFoundEntities = me.retrieveNonFoundEntities(entities);
                 var initialResponseHandler = null; // Define initial response handler
@@ -186,7 +186,7 @@ class SheetBot{
         var me = this;
         var responseHandler = (currentEntity, userResponse, entities, intent, convo) => {
             // Create query
-            me.fillEntity(currentEntity.column, userResponse, entities);
+            me.fillEntity(currentEntity.inputColumn, userResponse, entities);
             let sqlQuery = me.createSQLQuery(entities, intent);
             // Execute query
             this.executeSQLQuery(sqlQuery, (results) => {
@@ -205,19 +205,19 @@ class SheetBot{
                 entities = updatedEntities;
             }
             // Ask Question
-            me.prepareQuestion(currentEntity, intent.sourceTable, (botQuestion) => {
+            me.prepareQuestion(currentEntity, intent.sourceSheet, (botQuestion) => {
                 convo.ask(botQuestion, (response, convo) => {
                     // Retrieve response
                     let userResponse = response.text;
                     // Check if element exists in table (if not, send suggestions and re-ask)
-                    me.checkValueExistsInDatabase(currentEntity.column, userResponse, currentEntity.function, intent.sourceTable,
+                    me.checkValueExistsInDatabase(currentEntity.inputColumn, userResponse, currentEntity.mask, intent.sourceSheet,
                         (exists) => {
                             if(exists){
                                 responseHandler(currentEntity, userResponse, entities, intent, convo);
                             }
                             else{
                                 // Repeat question
-                                me.prepareRepeatQuestion(currentEntity, intent.sourceTable, userResponse,
+                                me.prepareRepeatQuestion(currentEntity, intent.sourceSheet, userResponse,
                                     (botRepeatQuestion) => {
                                         convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
                                             currentEntity, entities, intent, responseHandler
@@ -244,7 +244,7 @@ class SheetBot{
             let userResponse = response.text;
             // Check if element exists in table (if not, send suggestions and re-ask)
             me.checkValueExistsInDatabase(
-                currentEntity.column, userResponse, currentEntity.function, intent.sourceTable,
+                currentEntity.inputColumn, userResponse, currentEntity.mask, intent.sourceSheet,
                 (exists) => {
                     if(exists){
                         // Execute callback
@@ -252,7 +252,7 @@ class SheetBot{
                     }
                     else{
                         console.log('Elements not exists');
-                        me.prepareRepeatQuestion(currentEntity, intent.sourceTable, userResponse,
+                        me.prepareRepeatQuestion(currentEntity, intent.sourceSheet, userResponse,
                             (botRepeatQuestion) => {
                             convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
                                 currentEntity, entities, intent, responseCallback
@@ -268,7 +268,7 @@ class SheetBot{
         var me = this;
         var responseHandler = (currentEntity, response, entities, intent, convo) => {
             // Create query
-            me.fillEntity(currentEntity.column, response, entities);
+            me.fillEntity(currentEntity.inputColumn, response, entities);
             // Call next entity handler
             nextEntityCallback(response, convo, entities);
         };
@@ -278,19 +278,19 @@ class SheetBot{
                 entities = updatedEntities;
             }
             // Ask Question
-            me.prepareQuestion(currentEntity, intent.sourceTable, (botQuestion) => {
+            me.prepareQuestion(currentEntity, intent.sourceSheet, (botQuestion) => {
                 convo.ask(botQuestion, (response, convo) => {
                     // Retrieve response
                     let userResponse = response.text;
                     // Check if element exists in table (if not, send suggestions and re-ask)
-                    me.checkValueExistsInDatabase(currentEntity.column, userResponse, currentEntity.function, intent.sourceTable,
+                    me.checkValueExistsInDatabase(currentEntity.inputColumn, userResponse, currentEntity.mask, intent.sourceSheet,
                         (exists) => {
                             if(exists){
                                 responseHandler(currentEntity, userResponse, entities, intent, convo);
                             }
                             else{
                                 // Prepare question to repeat
-                                me.prepareRepeatQuestion(currentEntity, intent.sourceTable, userResponse,
+                                me.prepareRepeatQuestion(currentEntity, intent.sourceSheet, userResponse,
                                     (botRepeatQuestion) => {
                                         convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
                                             currentEntity, entities, intent, responseHandler
@@ -334,8 +334,8 @@ class SheetBot{
             }
         }
         else{
-            if(intent.response.customNoResultsFoundMessage){
-                resultMessages.push(intent.response.customNoResultsFoundMessage);
+            if(intent.response.notFoundMessage){
+                resultMessages.push(intent.response.notFoundMessage);
             }
             else{
                 resultMessages.push('Results not found');
@@ -348,14 +348,14 @@ class SheetBot{
         // Construct where condition based on entities
         let whereCondition = '';
         // Create where condition with AND operand
-        for(let i=0;i<entities.length-1;i++){
-            whereCondition += ' '+this.whereConditionParsing(entities[i].column, entities[i].function, entities[i].value)+' AND';
+        for(let i=0;i<entities.length;i++){
+            whereCondition += ' '+this.whereConditionParsing(entities[i].inputColumn, entities[i].mask, entities[i].value)+' AND';
         }
         // Create last condition of where
-        whereCondition += ' '+this.whereConditionParsing(entities[entities.length-1].column, entities[entities.length-1].function, entities[entities.length-1].value);
+        whereCondition = whereCondition.slice(0, -4);
         let sqlQuery = this.parseQuery('SELECT %s FROM %s WHERE %s',
             intent.response.outputColumn,
-            intent.sourceTable,
+            intent.sourceSheet,
             whereCondition);
         return sqlQuery;
     }
@@ -411,15 +411,15 @@ class SheetBot{
     fillEntities(definedEntities, foundEntities) {
         var remainEntities = JSON.parse(JSON.stringify(definedEntities));
         for(let i=0; i<remainEntities.length;i++){
-            if(Array.isArray(definedEntities[i].column)){
-                if(foundEntities[definedEntities[i].column[0].toLowerCase()]){
-                    remainEntities[i].value = foundEntities[definedEntities[i].column[0].toLowerCase()][0].value;
-                    console.log('Found multi-column entity '+remainEntities[i].column[0]+' with value '+remainEntities[i].value);
+            if(Array.isArray(definedEntities[i].inputColumn)){
+                if(foundEntities[definedEntities[i].inputColumn[0].toLowerCase()]){
+                    remainEntities[i].value = foundEntities[definedEntities[i].inputColumn[0].toLowerCase()][0].value;
+                    console.log('Found multi-column entity '+remainEntities[i].inputColumn[0]+' with value '+remainEntities[i].value);
                 }
             }
-            else if(foundEntities[definedEntities[i].column.toLowerCase()]){
-                remainEntities[i].value = foundEntities[definedEntities[i].column.toLowerCase()][0].value;
-                console.log('Found entity '+remainEntities[i].column+' with value '+remainEntities[i].value);
+            else if(foundEntities[definedEntities[i].inputColumn.toLowerCase()]){
+                remainEntities[i].value = foundEntities[definedEntities[i].inputColumn.toLowerCase()][0].value;
+                console.log('Found entity '+remainEntities[i].inputColumn+' with value '+remainEntities[i].value);
             }
         }
         return remainEntities;
@@ -437,7 +437,7 @@ class SheetBot{
 
     fillEntity(column, value, entities){
         for(let i=0;i<entities.length;i++){
-            if(entities[i].column.toLowerCase()===column.toLowerCase()){
+            if(entities[i].inputColumn.toLowerCase()===column.toLowerCase()){
                 entities[i].value = value;
             }
         }
@@ -461,7 +461,7 @@ class SheetBot{
         let promises = [];
         for(let i=0;i<entities.length;i++){
             promises.push(new Promise((resolve) => {
-                this.checkValueExistsInDatabase(entities[i].column, entities[i].value, entities[i].function, sourceTable,
+                this.checkValueExistsInDatabase(entities[i].inputColumn, entities[i].value, entities[i].mask, sourceTable,
                     (exists) => {
                         if(!exists){
                             entities[i].value = null;
@@ -519,9 +519,9 @@ class SheetBot{
     }
 
     retrieveTableSchema(tableName){
-        for(let i=0;i<this.model.schema.tabularData.length;i++){
-            if(this.model.schema.tabularData[i].gSheetName===tableName){
-                return this.model.schema.tabularData[i];
+        for(let i=0;i<this.model.schema.sheets.length;i++){
+            if(this.model.schema.sheets[i].gSheetName===tableName){
+                return this.model.schema.sheets[i];
             }
         }
     }
@@ -583,10 +583,10 @@ class SheetBot{
         this.retrieveSuggestions(currentEntity, sourceTable, null, (suggestions) => {
             // Prepare message
             if(callback && typeof callback==='function'){
-                let message = 'Set column '+currentEntity.column+' value, for example:';
+                let message = 'Set column '+currentEntity.inputColumn+' value, for example:';
                 // If custom message is defined, set as message preface
-                if(currentEntity.columnQuestion){
-                    message = currentEntity.columnQuestion;
+                if(currentEntity.entityMissingMessage){
+                    message = currentEntity.entityMissingMessage;
                 }
                 message = me.parseQuestionMessage(message, suggestions);
                 callback(message);
@@ -602,8 +602,8 @@ class SheetBot{
             if(callback && typeof callback==='function'){
                 let message = 'Value not found. Try:';
                 // If custom message is defined, set as message preface
-                if(currentEntity.suggestionCustomMessage){
-                    message = currentEntity.suggestionCustomMessage;
+                if(currentEntity.entityNotFoundMessage){
+                    message = currentEntity.entityNotFoundMessage;
                 }
                 message = me.parseQuestionMessage(message, suggestions);
                 callback(message);
@@ -625,11 +625,11 @@ class SheetBot{
     retrieveSuggestions(currentEntity, sourceTable, userResponse, callback){
         // TODO Check in different way depending on userResponse value (give different suggestions)
         let targetColumn = null;
-        if(Array.isArray(currentEntity.column)){
-            targetColumn = currentEntity.column[0];
+        if(Array.isArray(currentEntity.inputColumn)){
+            targetColumn = currentEntity.inputColumn[0];
         }
         else{
-            targetColumn = currentEntity.column;
+            targetColumn = currentEntity.inputColumn;
         }
         let sqlQuery = this.parseQuery(
             'SELECT DISTINCT %s FROM %s',
