@@ -15,7 +15,7 @@ class SheetBot{
 
         // Defined static values
         this.params = {};
-        this.params.maxSuggestions = 7;
+        this.params.maxSuggestions = 5;
         this.params.defaultNumberOfResponses = 1;
     }
 
@@ -205,19 +205,19 @@ class SheetBot{
                 entities = updatedEntities;
             }
             // Ask Question
-            me.prepareQuestion(currentEntity, intent.sourceSheet, (botQuestion) => {
+            me.prepareQuestion(currentEntity, entities, intent.sourceSheet, (botQuestion) => {
                 convo.ask(botQuestion, (response, convo) => {
                     // Retrieve response
                     let userResponse = response.text;
                     // Check if element exists in table (if not, send suggestions and re-ask)
-                    me.checkValueExistsInDatabase(currentEntity.inputColumn, userResponse, currentEntity.mask, intent.sourceSheet,
+                    me.checkValueExistsInDatabase(currentEntity.inputColumn, userResponse, currentEntity.mask, entities, intent.sourceSheet,
                         (exists) => {
                             if(exists){
                                 responseHandler(currentEntity, userResponse, entities, intent, convo);
                             }
                             else{
                                 // Repeat question
-                                me.prepareRepeatQuestion(currentEntity, intent.sourceSheet, userResponse,
+                                me.prepareRepeatQuestion(currentEntity, entities, intent.sourceSheet, userResponse,
                                     (botRepeatQuestion) => {
                                         convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
                                             currentEntity, entities, intent, responseHandler
@@ -244,7 +244,7 @@ class SheetBot{
             let userResponse = response.text;
             // Check if element exists in table (if not, send suggestions and re-ask)
             me.checkValueExistsInDatabase(
-                currentEntity.inputColumn, userResponse, currentEntity.mask, intent.sourceSheet,
+                currentEntity.inputColumn, userResponse, currentEntity.mask, entities, intent.sourceSheet,
                 (exists) => {
                     if(exists){
                         // Execute callback
@@ -252,7 +252,7 @@ class SheetBot{
                     }
                     else{
                         console.log('Elements not exists');
-                        me.prepareRepeatQuestion(currentEntity, intent.sourceSheet, userResponse,
+                        me.prepareRepeatQuestion(currentEntity, entities, intent.sourceSheet, userResponse,
                             (botRepeatQuestion) => {
                             convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
                                 currentEntity, entities, intent, responseCallback
@@ -278,19 +278,19 @@ class SheetBot{
                 entities = updatedEntities;
             }
             // Ask Question
-            me.prepareQuestion(currentEntity, intent.sourceSheet, (botQuestion) => {
+            me.prepareQuestion(currentEntity, entities, intent.sourceSheet, (botQuestion) => {
                 convo.ask(botQuestion, (response, convo) => {
                     // Retrieve response
                     let userResponse = response.text;
                     // Check if element exists in table (if not, send suggestions and re-ask)
-                    me.checkValueExistsInDatabase(currentEntity.inputColumn, userResponse, currentEntity.mask, intent.sourceSheet,
+                    me.checkValueExistsInDatabase(currentEntity.inputColumn, userResponse, currentEntity.mask, entities, intent.sourceSheet,
                         (exists) => {
                             if(exists){
                                 responseHandler(currentEntity, userResponse, entities, intent, convo);
                             }
                             else{
                                 // Prepare question to repeat
-                                me.prepareRepeatQuestion(currentEntity, intent.sourceSheet, userResponse,
+                                me.prepareRepeatQuestion(currentEntity, entities, intent.sourceSheet, userResponse,
                                     (botRepeatQuestion) => {
                                         convo.ask(botRepeatQuestion, me.retrieveRepeatQuestionHandler(
                                             currentEntity, entities, intent, responseHandler
@@ -358,6 +358,16 @@ class SheetBot{
             intent.sourceSheet,
             whereCondition);
         return sqlQuery;
+    }
+
+    createWhereConditionBasedOnDefinedEntities(entities){
+        let whereCondition = '';
+        for(let i=0;i<entities.length;i++){
+            if(entities[i].value){
+                whereCondition += ' '+this.whereConditionParsing(entities[i].inputColumn, entities[i].mask, entities[i].value)+' AND';
+            }
+        }
+        return whereCondition.slice(0, -4);
     }
 
     whereConditionParsing(column, operand, value){
@@ -461,9 +471,12 @@ class SheetBot{
         let promises = [];
         for(let i=0;i<entities.length;i++){
             promises.push(new Promise((resolve) => {
-                this.checkValueExistsInDatabase(entities[i].inputColumn, entities[i].value, entities[i].mask, sourceTable,
+                this.checkValueExistsInDatabase(entities[i].inputColumn, entities[i].value, entities[i].mask, entities, sourceTable,
                     (exists) => {
                         if(!exists){
+                            if(entities[i].value){
+                                entities[i].tried = true;
+                            }
                             entities[i].value = null;
                         }
                         resolve();
@@ -476,12 +489,17 @@ class SheetBot{
         });
     }
 
-    checkValueExistsInDatabase(column, value, operand, sourceTable, callback) {
+    checkValueExistsInDatabase(column, value, operand, entities, sourceTable, callback) {
         let whereCondition = this.whereConditionParsing(column, operand, value);
         let sqlQuery = this.parseQuery(
             'SELECT COUNT(*) AS number FROM %s WHERE %s',
             sourceTable,
             whereCondition);
+        let previousEntitiesWhereStatement = this.createWhereConditionBasedOnDefinedEntities(entities);
+        if(previousEntitiesWhereStatement!==''){
+            sqlQuery += ' AND '+previousEntitiesWhereStatement;
+        }
+
         this.executeSQLQuery(sqlQuery, (result) => {
             if(callback && typeof callback==='function'){
                 callback(result[0].number > 0);
@@ -577,16 +595,25 @@ class SheetBot{
 
     }
 
-    prepareQuestion(currentEntity, sourceTable, callback){
+    prepareQuestion(currentEntity, entities, sourceTable, callback){
         var me = this;
         // Retrieve suggestions
-        this.retrieveSuggestions(currentEntity, sourceTable, null, (suggestions) => {
+        this.retrieveSuggestions(currentEntity, entities, sourceTable, null, (suggestions) => {
             // Prepare message
             if(callback && typeof callback==='function'){
                 let message = 'Set column '+currentEntity.inputColumn+' value, for example:';
-                // If custom message is defined, set as message preface
-                if(currentEntity.entityMissingMessage){
-                    message = currentEntity.entityMissingMessage;
+                // Check if user tried to set value of this message before
+                if(currentEntity.tried){
+                    // If custom message is defined, set as message preface
+                    if(currentEntity.entityNotFoundMessage){
+                        message = currentEntity.entityNotFoundMessage;
+                    }
+                }
+                else{
+                    // If custom message is defined, set as message preface
+                    if(currentEntity.entityMissingMessage){
+                        message = currentEntity.entityMissingMessage;
+                    }
                 }
                 message = me.parseQuestionMessage(message, suggestions);
                 callback(message);
@@ -594,10 +621,10 @@ class SheetBot{
         });
     }
 
-    prepareRepeatQuestion(currentEntity, sourceTable, userResponse, callback) {
+    prepareRepeatQuestion(currentEntity, entities, sourceTable, userResponse, callback) {
         var me = this;
         // Retrieve suggestions
-        this.retrieveSuggestions(currentEntity, sourceTable, userResponse, (suggestions) => {
+        this.retrieveSuggestions(currentEntity, entities, sourceTable, userResponse, (suggestions) => {
             // Prepare message
             if(callback && typeof callback==='function'){
                 let message = 'Value not found. Try:';
@@ -622,8 +649,9 @@ class SheetBot{
         return parsedMessage;
     }
 
-    retrieveSuggestions(currentEntity, sourceTable, userResponse, callback){
+    retrieveSuggestions(currentEntity, entities, sourceTable, userResponse, callback){
         // TODO Check in different way depending on userResponse value (give different suggestions)
+        // Set query SELECT and FROM
         let targetColumn = null;
         if(Array.isArray(currentEntity.inputColumn)){
             targetColumn = currentEntity.inputColumn[0];
@@ -635,18 +663,37 @@ class SheetBot{
             'SELECT DISTINCT %s FROM %s',
             targetColumn,
             sourceTable);
+        // Add previous set entities conditions to WHERE statement
+        let previousEntitiesWhereStatement = this.createWhereConditionBasedOnDefinedEntities(entities);
+        if(previousEntitiesWhereStatement!==''){
+            sqlQuery += ' WHERE '+previousEntitiesWhereStatement;
+        }
         var me = this;
         this.executeSQLQuery(sqlQuery, (results) => {
+            // Randomize results
+            let shuffledResults = me.shuffleArray(results);
+            // Prepare suggestions
             let suggestions = [];
             for(let i=0;i<me.params.maxSuggestions;i++){
-                if(results[i] && results[i][targetColumn]){
-                    suggestions.push(results[i][targetColumn]);
+                if(shuffledResults[i] && shuffledResults[i][targetColumn]){
+                    suggestions.push(shuffledResults[i][targetColumn]);
                 }
             }
             if(callback && typeof callback==='function'){
                 callback(suggestions);
             }
         });
+    }
+
+    shuffleArray(originalArray) {
+        let array = JSON.parse(JSON.stringify(originalArray));
+        for (var i = array.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+        }
+        return array;
     }
 }
 

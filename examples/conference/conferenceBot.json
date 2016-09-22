@@ -1,53 +1,55 @@
 {
-  "description": "WISE conference sessions related bot.",
-  "greetings": "This bot helps you to retrieve information related with the WISE 2015 conference. Try typing 'Show sessions'.",
-  "tabularData": [
+  "sheets": [
     {
-      "gSheetToken": "1LQxk0GCHnPCdSzIRaiMJwUIWuI5HTvbncs8KCjoyAUM",
       "gSheetName": "Schedules",
       "gSheetRange": "A1:F22"
     }
   ],
-  "intents": [
-    {
-      "ID": "retrieveSessionsPerSlot",
-      "sourceTable": "Schedules",
-      "response": {
-        "outputColumn": "Session1, Session2, Session3, Session4",
-        "numberOfResponses": 1,
-        "customNoResultsFoundMessage": "Sessions not found for this slot",
-        "showColumnName": true
-      },
-      "entities": [
-        {
-          "column": "Slot",
-          "function": "LIKE",
-          "columnQuestion": "Choose a slot, for example:",
-          "suggestionCustomMessage": "Slot not found, try another one:"
+  "chat":{
+    "description": "WISE conference sessions related bot.",
+    "greetings": "This bot helps you to retrieve information related with the WISE 2015 conference. Try typing 'Show sessions'.",
+    "intents": [
+      {
+        "ID": "retrieveSlotByTopic",
+        "sourceSheet": "Schedules",
+        "response": {
+          "outputColumn": "Day, Slot",
+          "notFoundMessage": "Events not found",
+          "numberOfResponses": 5,
+          "customResponseStructure": ["An event at %s on %s is scheduled.", "Slot", "Day"]
         },
-        {
-          "column": "Day",
-          "function": "LIKE",
-          "columnQuestion": "Please choose one day. For example:",
-          "suggestionCustomMessage": "Day not found. Try with another one:"
-        }]
-    },
-    {
-      "ID": "retrieveSlotByTopic",
-      "sourceTable": "Schedules",
-      "response": {
-        "outputColumn": "Day, Slot",
-        "customNoResultsFoundMessage": "Events not found",
-        "numberOfResponses": 5,
-        "customResponseStructure": ["An event at %s on %s is scheduled.", "Slot", "Day"]
+        "entities": [
+          {
+            "inputColumn": ["Session1", "Session2", "Session3", "Session4"],
+            "mask": "LIKE",
+            "entityMissingMessage": "Search for a topic, room or chairman, for example:",
+            "entityNotFoundMessage": "Topic, room or chairman not found, try another one:"
+          }]
       },
-      "entities": [
-        {
-          "column": ["Session1", "Session2", "Session3", "Session4"],
-          "function": "LIKE",
-          "columnQuestion": "Search for a topic, room or chairman, for example:",
-          "suggestionCustomMessage": "Topic, room or chairman not found, try another one:"
-        }]
-    }
-  ]
+      {
+        "ID": "retrieveSessionsPerSlot",
+        "sourceSheet": "Schedules",
+        "response": {
+          "outputColumn": "Session1, Session2, Session3, Session4",
+          "numberOfResponses": 1,
+          "notFoundMessage": "Sessions not found for this slot",
+          "showColumnName": true
+        },
+        "entities": [
+          {
+            "inputColumn": "Slot",
+            "mask": "LIKE",
+            "entityMissingMessage": "Choose a slot, for example:",
+            "entityNotFoundMessage": "Slot not found, try another one:"
+          },
+          {
+            "inputColumn": "Day",
+            "mask": "LIKE",
+            "entityMissingMessage": "Please choose one day. For example:",
+            "entityNotFoundMessage": "Day not found. Try with another one:"
+          }
+        ]
+      }
+    ]
+  }
 }
